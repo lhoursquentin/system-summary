@@ -1,0 +1,128 @@
+#!/bin/sh
+
+separator="${1-'
+'}"
+
+red_nb=31
+green_nb=32
+orange_nb=33
+blue_nb=34
+purple_nb=35
+cyan_nb=36
+white_nb=37
+
+color() {
+  color_nb=
+  value="$1"
+  shift
+  while [ "$#" -gt 1 ]; do
+    threshold="$1"
+    color_nb="$2"
+    shift 2
+    if [ "$value" -gt "$threshold" ]; then
+      return;
+    fi
+  done
+  color_nb="$1"
+}
+
+print_result() {
+  while [ "$#" -gt 1 ]; do
+    printf '%s%s' "$("$1")" "$separator"
+    shift
+  done
+  "$1"
+}
+
+show_active_connections() {
+  nmcli --get-values NAME --color no connection show --active |
+    sed '
+      :start
+      $!{
+        N
+        b start
+      }
+      s/\n/ + /
+    '
+}
+
+show_wifi_link_quality() {
+  for wireless_path in /sys/class/net/*/wireless; do
+    if [ "$wireless_path" = '/sys/class/net/*/wireless' ]; then
+      echo no wifi card >&2
+      return 1
+    fi
+    device_path="${wireless_path%/wireless}"
+    device_name="${device_path##*/}"
+    link_quality="$(($(
+      iwconfig "$device_name" |
+      sed -n 's/.*Link Quality=\([0-9]*\)\/\([0-9]*\).*/\1*100\/\2/p'
+    )))"
+
+    if [ -z "$link_quality" ]; then
+      continue
+    fi
+
+    color "$link_quality" \
+      70 "$green_nb" \
+      40 "$orange_nb" \
+         "$red_nb"
+
+    printf '%s: \033[0;%sm%s%%\033[0m\n' "$device_name" "$color_nb" "$link_quality"
+  done
+}
+
+show_time_and_date() {
+  date +'%H:%M:%S %d/%m/%Y'
+}
+
+show_fan_speed() {
+  printf fans:
+  for fan in /sys/class/hwmon/*/fan?_input; do
+    printf ' '
+    if [ "$fan" = '/sys/class/hwmon/*/fan?_input' ]; then
+      echo no fan >&2
+      return 1
+    fi
+    printf %s "$(cat "$fan")"
+  done
+  echo
+}
+
+show_home_disk_usage() {
+  printf 'home: '
+  df /home -h --output=used,size,pcent | {
+    read header
+    read used size pcent
+    color "${pcent%\%}" \
+      90 "$red_nb" \
+      70 "$orange_nb" \
+         "$white_nb"
+    printf '\033[0;%sm%s\033[0m/%s\n' "$color_nb" "$used" "$size"
+  }
+}
+
+show_battery_status() {
+  read status < /sys/class/power_supply/BAT0/status
+  read capacity < /sys/class/power_supply/BAT0/capacity
+  printf 'Bat: \033[0;'
+
+  color_nb="$purple_nb"
+  if [ "$status" = 'Discharging' ]; then
+    color "$capacity" \
+      80 "$green_nb" \
+      40 "$white_nb" \
+      10 "$orange_nb" \
+         "$red_nb"
+  fi
+  printf '%sm%s%%\033[0m\n' "$color_nb" "$capacity"
+}
+
+print_result \
+  show_active_connections \
+  show_wifi_link_quality \
+  show_fan_speed \
+  show_battery_status \
+  show_time_and_date \
+  show_home_disk_usage \
+
