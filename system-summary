@@ -2,7 +2,6 @@
 
 # TODO
 # cpu/load
-# bluetooth + usb devices
 # separator-color
 
 usage() {
@@ -240,12 +239,13 @@ show_bluetooth_connections() {
     bluetoothctl -- info |
       sed -n '
         /^[[:blank:]]*Name: /{
-          s//+ /
+          s///
           H
         }
         ${
           g
-          s/...//
+          s/.//
+          s/\n/ + /g
           p
         }
       '
@@ -256,7 +256,24 @@ show_bluetooth_connections() {
   fi
 }
 
+show_usb_devices() {
+  new-usb |
+    sed -n '
+      /.*ID [[:alnum:]]*:[[:alnum:]]* /{
+        s///
+        H
+      }
+      ${
+        g
+        s/.//
+        s/\n/ + /g
+        p
+      }
+    '
+}
+
 print_result \
+  show_usb_devices \
   show_bluetooth_connections \
   show_network_connections \
   show_wifi_link_quality \
