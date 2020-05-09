@@ -1,37 +1,118 @@
 #!/bin/sh
 
-separator="${1-'
-'}"
+# TODO
+# cpu/load
+# bluetooth + usb devices
+# separator-color
 
-red_nb=31
-green_nb=32
-orange_nb=33
-blue_nb=34
-purple_nb=35
-cyan_nb=36
-white_nb=37
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [options]
 
-color() {
-  color_nb=
+Options:
+  -h,--help
+  -c,--color <auto|never|always|pango>
+  -s,--separator <separator>
+EOF
+  exit "${1-0}"
+}
+
+color_mode=auto
+separator=' | '
+
+nb_args="$#"
+while [ "$nb_args" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      ;;
+    -c|--color)
+      shift; nb_args="$((nb_args - 1))"
+			case "$1" in
+        auto|never|always|pango)
+          color_mode="$1"
+          ;;
+        *)
+          usage 1 >&2
+          ;;
+      esac
+      ;;
+    -s|--separator)
+      shift; nb_args="$((nb_args - 1))"
+      if [ "$#" -eq 0 ]; then
+        usage 1 >&2
+      fi
+      separator="$1"
+      ;;
+  esac
+  shift; nb_args="$((nb_args - 1))"
+done
+
+if [ "$color_mode" = auto ]; then
+  if [ -t 1 ]; then
+    color_mode=always
+  else
+    color_mode=never
+  fi
+fi
+
+case "$color_mode" in
+  never)
+    color () {
+      color_format=%s
+    }
+    ;;
+  always)
+    color() {
+      case "$1" in
+        black) term_value=0 ;;
+        red) term_value=1 ;;
+        green) term_value=2 ;;
+        yellow) term_value=3 ;;
+        blue) term_value=4 ;;
+        magenta) term_value=5 ;;
+        cyan) term_value=6 ;;
+        white) term_value=7 ;;
+      esac
+      color_format='\033[0;3'"$term_value"'m%s\033[0m'
+    }
+    ;;
+  pango)
+    color() {
+      # no handling for html content in $2
+      color_format='<span foreground="'"$1"'">%s</span>'
+    }
+    ;;
+esac
+
+color_value() {
   value="$1"
   shift
   while [ "$#" -gt 1 ]; do
     threshold="$1"
-    color_nb="$2"
+    color="$2"
     shift 2
     if [ "$value" -gt "$threshold" ]; then
+      color "$color"
       return;
     fi
   done
-  color_nb="$1"
+  color "$1"
 }
 
 print_result() {
-  while [ "$#" -gt 1 ]; do
-    printf '%s%s' "$("$1")" "$separator"
-    shift
+  format=''
+  nb_args="$#"
+  while [ "$nb_args" -gt 1 ]; do
+    format="$format%s%s"
+    set -- "$@" "$("$1")" "$separator"
+    shift; nb_args="$((nb_args - 1))"
   done
-  "$1"
+  last_cmd="$1"
+  shift
+  # Print once to prevent some utilities such as swaybar to display partial
+  # content
+  printf "$format"'%s\n' "$@" "$("$last_cmd")"
 }
 
 show_active_connections() {
@@ -63,12 +144,13 @@ show_wifi_link_quality() {
       continue
     fi
 
-    color "$link_quality" \
-      70 "$green_nb" \
-      40 "$orange_nb" \
-         "$red_nb"
+    printf '%s: ' "$device_name"
 
-    printf '%s: \033[0;%sm%s%%\033[0m\n' "$device_name" "$color_nb" "$link_quality"
+    color_value "$link_quality" \
+      70 green \
+      40 yellow \
+         red
+    printf "$color_format" "$link_quality"%
   done
 }
 
@@ -84,7 +166,12 @@ show_fan_speed() {
       echo no fan >&2
       return 1
     fi
-    printf %s "$(cat "$fan")"
+    read fan_rpm < "$fan"
+    color_value "$fan_rpm" \
+      3000 red \
+      0 yellow \
+        white
+    printf "$color_format" "$fan_rpm"
   done
   echo
 }
@@ -94,35 +181,65 @@ show_home_disk_usage() {
   df /home -h --output=used,size,pcent | {
     read header
     read used size pcent
-    color "${pcent%\%}" \
-      90 "$red_nb" \
-      70 "$orange_nb" \
-         "$white_nb"
-    printf '\033[0;%sm%s\033[0m/%s\n' "$color_nb" "$used" "$size"
+    color_value "${pcent%\%}" \
+      90 red \
+      70 yellow \
+         white
+    printf "$color_format" "$used/$size"
   }
 }
 
 show_battery_status() {
   read status < /sys/class/power_supply/BAT0/status
   read capacity < /sys/class/power_supply/BAT0/capacity
-  printf 'Bat: \033[0;'
+  printf 'bat: '
 
-  color_nb="$purple_nb"
   if [ "$status" = 'Discharging' ]; then
-    color "$capacity" \
-      80 "$green_nb" \
-      40 "$white_nb" \
-      10 "$orange_nb" \
-         "$red_nb"
+    color_value "$capacity" \
+      80 green \
+      40 white \
+      10 yellow \
+         red
+  else
+    color magenta
   fi
-  printf '%sm%s%%\033[0m\n' "$color_nb" "$capacity"
+  printf "$color_format" "$capacity"%
+}
+
+show_volume() {
+  amixer get Master |
+    sed -n '
+      /\[/{
+        # delete everything up to [
+        s/[^[]*//
+        # remove square brackets
+        s/[][]//g
+        # format output for read
+        s/%//
+        s/on/true/
+        s/off/false/
+        p
+        q
+      }
+    ' | {
+      read volume enabled
+      printf 'vol: '
+      if ! "$enabled"; then
+        color yellow
+        printf "$color_format" "$volume"%
+      else
+        printf %s "$volume"%
+      fi
+    }
 }
 
 print_result \
   show_active_connections \
   show_wifi_link_quality \
   show_fan_speed \
+  show_volume \
   show_battery_status \
-  show_time_and_date \
   show_home_disk_usage \
+  show_time_and_date \
 
+# keep above line blank
