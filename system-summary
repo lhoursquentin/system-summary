@@ -103,19 +103,21 @@ color_value() {
 print_result() {
   format=''
   nb_args="$#"
-  while [ "$nb_args" -gt 1 ]; do
-    format="$format%s%s"
-    set -- "$@" "$("$1")" "$separator"
+  while [ "$nb_args" -gt 0 ]; do
+    output="$("$1")"
+    if [ -n "$output" ]; then
+      format="$format%s%s"
+      set -- "$@" "$separator" "$output"
+    fi
     shift; nb_args="$((nb_args - 1))"
   done
-  last_cmd="$1"
-  shift
+  shift # remove leading separator
   # Print once to prevent some utilities such as swaybar to display partial
   # content
-  printf "$format"'%s\n' "$@" "$("$last_cmd")"
+  printf "$format"'\n' "$@"
 }
 
-show_active_connections() {
+show_network_connections() {
   nmcli --get-values NAME --color no connection show --active |
     sed '
       :start
@@ -233,8 +235,30 @@ show_volume() {
     }
 }
 
+show_bluetooth_connections() {
+  devices="$(
+    bluetoothctl -- info |
+      sed -n '
+        /^[[:blank:]]*Name: /{
+          s//+ /
+          H
+        }
+        ${
+          g
+          s/...//
+          p
+        }
+      '
+  )"
+  if [ -n "$devices" ]; then
+    color blue
+    printf "$color_format" "$devices"
+  fi
+}
+
 print_result \
-  show_active_connections \
+  show_bluetooth_connections \
+  show_network_connections \
   show_wifi_link_quality \
   show_fan_speed \
   show_volume \
