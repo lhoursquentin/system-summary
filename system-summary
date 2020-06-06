@@ -2,6 +2,7 @@
 
 # TODO
 # cpu/load
+# backlight
 # separator-color
 
 usage() {
@@ -272,7 +273,21 @@ show_usb_devices() {
     '
 }
 
+show_top_cpu() {
+  ps axk pcpu o comm,pcpu | tail -n 1 | {
+    read process percent
+    percent="${percent%.*}"
+    color_value "$percent" \
+      50 red \
+      10 yellow \
+      5  white \
+         green
+    printf '%s: '"$color_format" "$process" "$percent"%
+  }
+}
+
 print_result \
+  show_top_cpu \
   show_usb_devices \
   show_bluetooth_connections \
   show_network_connections \
