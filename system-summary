@@ -18,7 +18,8 @@ EOF
 }
 
 color_mode=auto
-separator=' | '
+separator='
+'
 
 nb_args="$#"
 while [ "$nb_args" -gt 0 ]; do
@@ -43,6 +44,9 @@ while [ "$nb_args" -gt 0 ]; do
         usage 1 >&2
       fi
       separator="$1"
+      ;;
+    -?|--*)
+      usage 1 >&2
       ;;
   esac
   shift; nb_args="$((nb_args - 1))"
