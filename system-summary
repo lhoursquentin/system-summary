@@ -9,13 +9,15 @@ usage() {
 Usage: ${0##*/} [options]
 
 Options:
-  -h,--help
-  -c,--color <auto|never|always|pango>
-  -s,--separator <separator>
+  -c,--color <auto|never|always|pango>   use pango for sway-bar (default: auto)
+  -h,--help                              print this message
+  -i,--icons                             use unicode symbols instead of plain text
+  -s,--separator <separator>             what to print between each value (default: newline)
 EOF
   exit "${1-0}"
 }
 
+icons=false
 color_mode=auto
 separator='
 '
@@ -23,9 +25,6 @@ separator='
 nb_args="$#"
 while [ "$nb_args" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      ;;
     -c|--color)
       shift; nb_args="$((nb_args - 1))"
 			case "$1" in
@@ -36,6 +35,12 @@ while [ "$nb_args" -gt 0 ]; do
           usage 1 >&2
           ;;
       esac
+      ;;
+    -h|--help)
+      usage
+      ;;
+    -i|--icons)
+      icons=true
       ;;
     -s|--separator)
       shift; nb_args="$((nb_args - 1))"
@@ -107,8 +112,7 @@ print_result() {
   format=''
   nb_args="$#"
   while [ "$nb_args" -gt 0 ]; do
-    output="$("$1")"
-    if [ -n "$output" ]; then
+    if output="$("$1")" && [ -n "$output" ]; then
       format="$format%s%s"
       set -- "$@" "$separator" "$output"
     fi
@@ -149,7 +153,11 @@ show_wifi_link_quality() {
       continue
     fi
 
-    printf '%s: ' "$device_name"
+    if "$icons"; then
+      printf '\U0001F4E1 ' # Satellite Antenna
+    else
+      printf 'wifi: '
+    fi
 
     color_value "$link_quality" \
       70 green \
@@ -164,7 +172,12 @@ show_time_and_date() {
 }
 
 show_fan_speed() {
-  printf fans:
+  if "$icons"; then
+    printf '\U0001F4A8' # Dash Symbol
+  else
+    printf fans:
+  fi
+  found_running_fan=false
   for fan in /sys/class/hwmon/*/fan?_input; do
     printf ' '
     if [ "$fan" = '/sys/class/hwmon/*/fan?_input' ]; then
@@ -172,17 +185,30 @@ show_fan_speed() {
       return 1
     fi
     read fan_rpm < "$fan"
+    if [ "$fan_rpm" -gt 0 ]; then
+      found_running_fan=true
+    else
+      continue
+    fi
     color_value "$fan_rpm" \
       3000 red \
       0 yellow \
         white
     printf "$color_format" "$fan_rpm"
   done
+
+  if ! "$found_running_fan"; then
+    return 1
+  fi
   echo
 }
 
 show_home_disk_usage() {
-  printf 'home: '
+  if "$icons"; then
+    printf '\U0001F3E0 ' # House Building
+  else
+    printf 'home: '
+  fi
   df /home -h --output=used,size,pcent | {
     read header
     read used size pcent
@@ -197,7 +223,11 @@ show_home_disk_usage() {
 show_battery_status() {
   read status < /sys/class/power_supply/BAT0/status
   read capacity < /sys/class/power_supply/BAT0/capacity
-  printf 'bat: '
+  if "$icons"; then
+    printf '\U0001F50B ' # Battery
+  else
+    printf 'bat: '
+  fi
 
   if [ "$status" = 'Discharging' ]; then
     color_value "$capacity" \
@@ -228,12 +258,16 @@ show_volume() {
       }
     ' | {
       read volume enabled
-      printf 'vol: '
+      if "$icons"; then
+        printf '\U0000266A ' # Eighth Note
+      else
+        printf 'vol: '
+      fi
       if ! "$enabled"; then
         color yellow
         printf "$color_format" "$volume"%
       else
-        printf %s "$volume"%
+        printf '%s' "$volume"%
       fi
     }
 }
@@ -294,10 +328,15 @@ show_backlight() {
     /sys/class/backlight/*/brightness \
     /sys/class/backlight/*/max_brightness
   )"
+  if "$icons"; then
+    printf '\U0001F4A1 ' # Electric Light Bulb
+  else
+    printf 'backlight: '
+  fi
   # can we do less readable please?
-  printf 'backlight: %s\n' "$((${brightness_values%
+  printf '%s\n' "$((${brightness_values%
 *} * 100 / ${brightness_values#*
-}))"
+}))"%
 }
 
 print_result \
