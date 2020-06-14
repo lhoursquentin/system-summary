@@ -2,7 +2,6 @@
 
 # TODO
 # cpu/load
-# backlight
 # separator-color
 
 usage() {
@@ -290,13 +289,25 @@ show_top_cpu() {
   }
 }
 
+show_backlight() {
+  brightness_values="$(cat \
+    /sys/class/backlight/*/brightness \
+    /sys/class/backlight/*/max_brightness
+  )"
+  # can we do less readable please?
+  printf 'backlight: %s\n' "$((${brightness_values%
+*} * 100 / ${brightness_values#*
+}))"
+}
+
 print_result \
-  show_top_cpu \
-  show_usb_devices \
   show_bluetooth_connections \
+  show_usb_devices \
+  show_top_cpu \
   show_network_connections \
   show_wifi_link_quality \
   show_fan_speed \
+  show_backlight \
   show_volume \
   show_battery_status \
   show_home_disk_usage \
