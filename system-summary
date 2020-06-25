@@ -27,7 +27,7 @@ while [ "$nb_args" -gt 0 ]; do
   case "$1" in
     -c|--color)
       shift; nb_args="$((nb_args - 1))"
-			case "$1" in
+      case "$1" in
         auto|never|always|pango)
           color_mode="$1"
           ;;
@@ -259,7 +259,7 @@ show_volume() {
     ' | {
       read volume enabled
       if "$icons"; then
-        printf '\U0000266A ' # Eighth Note
+        printf '\U0001F3B7 ' # Saxophone
       else
         printf 'vol: '
       fi
