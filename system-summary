@@ -332,7 +332,6 @@ show_backlight() {
   else
     printf 'backlight: '
   fi
-  # can we do less readable please?
   printf '%s\n' "$((brightness * 100 / max_brightness))"%
 }
 
