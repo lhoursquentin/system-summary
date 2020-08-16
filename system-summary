@@ -324,25 +324,37 @@ show_top_cpu() {
 }
 
 show_backlight() {
-  brightness_values="$(cat \
-    /sys/class/backlight/*/brightness \
-    /sys/class/backlight/*/max_brightness
-  )"
+  read brightness < /sys/class/backlight/intel_backlight/brightness
+  read max_brightness < /sys/class/backlight/intel_backlight/max_brightness
+
   if "$icons"; then
     printf '\U0001F4A1 ' # Electric Light Bulb
   else
     printf 'backlight: '
   fi
   # can we do less readable please?
-  printf '%s\n' "$((${brightness_values%
-*} * 100 / ${brightness_values#*
-}))"%
+  printf '%s\n' "$((brightness * 100 / max_brightness))"%
+}
+
+show_song_playing() {
+  song_playing_file=~/.song-playing
+  if ! [ -f "$song_playing_file" ]; then
+    return 1
+  fi
+  read song_playing < "$song_playing_file"
+  if "$icons"; then
+    printf '\U0000266A ' # Eighth Note
+  else
+    printf 'song: '
+  fi
+  printf '%s\n' "$song_playing"
 }
 
 print_result \
   show_bluetooth_connections \
   show_usb_devices \
   show_top_cpu \
+  show_song_playing \
   show_network_connections \
   show_wifi_link_quality \
   show_fan_speed \

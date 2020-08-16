@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# grep generated from a fresh lsusb without any external device connected
+
+lsusb |
+  grep -v \
+  -e 04f3:289b \
+  -e 06cb:00bd \
+  -e 1d6b:0002 \
+  -e 1d6b:0003 \
+  -e 5986:2113 \
+  -e 8087:0026 \
